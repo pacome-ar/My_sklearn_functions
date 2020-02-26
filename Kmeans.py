@@ -16,6 +16,9 @@ class Kmeans():
         strategy for the initialisation
           if 'centroids': starts by choosing centroids randomly in X
           if 'labels': starts by randomly assigning lables to X
+    init_centroids: array like (defaults to None)
+        the initial guesses for the new_centroids
+        will only be used with init_start = 'centroids'
 
     Example:
     --------
@@ -27,12 +30,13 @@ class Kmeans():
     '''
 
     def __init__(self, nbclusters=3, random_state=42, maxiter=10,
-                        init_start='centroids'):
+                        init_start='centroids', init_centroids=None):
         '''Init function'''
         self.nbclusters = nbclusters
         self._rs = np.random.RandomState(random_state)
         self.maxiter = maxiter
         self.init_start = init_start
+        self.init_centroids = init_centroids
 
     def _init_random_labels(self, X):
         '''returns initial randomly picked classes for the data X'''
@@ -40,6 +44,8 @@ class Kmeans():
 
     def _init_random_centroids(self, X):
         '''returns initial randomly picked classes for the data X'''
+        if self.init_centroids:
+            return init_centroids
         rdm_index = self._rs.choice(range(len(X)),
                                     self.nbclusters,
                                     replace=False)
@@ -68,6 +74,10 @@ class Kmeans():
         dists = self._distance_to_centroid(X, centroids)
         return np.argmin(dists, axis=0)
 
+    def _get_inertia(self, X, centroids):
+        labels = self._get_clusters(X, centroids)
+        return ((X - centroids[labels])**2).sum()
+
     def fit(self, X, debug=False):
         '''fit function: trains a kmean solver'''
 
@@ -94,6 +104,7 @@ class Kmeans():
 
         self.centroids = centroids
         self.labels = self.predict(X)
+        self.inertia = self._get_inertia(X, centroids)
 
         if debug:
             label_keep.append(self.labels)
@@ -110,3 +121,28 @@ class Kmeans():
             raise Exception('can not transform an unfitted kmean')
 
         return self._get_clusters(X, self.centroids)
+
+#########################################
+
+def test_inertia_with_sklearn(n=200):
+    from sklearn.cluster import KMeans as skKmeans
+    from sklearn.datasets import make_blobs
+    X, y = make_blobs(n_samples=n, centers=3, n_features=2,
+                  random_state=1)
+    # sklearn
+    sk = skKmeans(n_clusters=3)
+    sk.fit(X)
+
+    kmean = Kmeans(nbclusters=3, maxiter=15, random_state=1,
+              init_start='centroids')
+    kmean.fit(X)
+
+    assert np.allclose(kmean.inertia, sk.inertia_), \
+            'inertia test failed, got {} instead of {}'.format(
+            kmean.inertia, sk.inertia_)
+
+    print('Inertia test passed')
+
+#########################################
+
+test_inertia_with_sklearn(200)
