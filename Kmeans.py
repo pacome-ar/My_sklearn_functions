@@ -16,6 +16,7 @@ class Kmeans():
         strategy for the initialisation
           if 'centroids': starts by choosing centroids randomly in X
           if 'labels': starts by randomly assigning lables to X
+          if 'K++': starts using the kmean++ algorithm
     init_centroids: array like (defaults to None)
         the initial guesses for the new_centroids
         will only be used with init_start = 'centroids'
@@ -38,6 +39,12 @@ class Kmeans():
         self.init_start = init_start
         self.init_centroids = init_centroids
 
+    def _pick_within_proba(self, proba):
+        '''returns a random number picked with proba'''
+        assert np.allclose(np.sum(proba), 1.), 'sum of proba should be 1'
+        cumsum = np.cumsum(proba)
+        return np.arange(len(cumsum))[cumsum >= self._rs.rand()][0]
+
     def _init_random_labels(self, X):
         '''returns initial randomly picked classes for the data X'''
         return self._rs.randint(0, self.nbclusters, len(X))
@@ -51,12 +58,21 @@ class Kmeans():
                                     replace=False)
         return X[rdm_index]
 
+    def _init_kmeanpp(self, X):
+        centroids = [X[self._rs.randint(0, len(X)+1)]]
+        for i in range(self.nbclusters):
+            proba = self._distance_to_centroid(
+                        X, np.array(centroids, copy=True)).min(axis=0)
+            proba = proba / proba.sum()
+            centroids.append(X[self._pick_within_proba(proba)])
+        return centroids
+
     def _distance_to_centroid(self, X, centroids):
         '''returns the array of the distances between X and the centroids
         If X is size n*m and centroids is size k
             returns a n*k array
         '''
-        return np.array([((X - x0)**2).mean(axis=1)
+        return np.array([((X - x0)**2).sum(axis=1)
                          for x0 in centroids])
 
     def _get_centroids(self, X, labels):
@@ -75,14 +91,17 @@ class Kmeans():
         return np.argmin(dists, axis=0)
 
     def _get_inertia(self, X, centroids):
-        labels = self._get_clusters(X, centroids)
-        return ((X - centroids[labels])**2).sum()
+        dists = self._distance_to_centroid(X, centroids)
+        return dists.min(axis=0).sum()
 
     def fit(self, X, debug=False):
         '''fit function: trains a kmean solver'''
 
         if self.init_start == 'centroids':
             centroids = self._init_random_centroids(X)
+            labels = self._get_clusters(X, centroids)
+        if self.init_start == 'K++':
+            centroids = self._init_kmeanpp(X)
             labels = self._get_clusters(X, centroids)
         elif self.init_start == 'labels':
             centroids = self._init_random_centroids(X)
