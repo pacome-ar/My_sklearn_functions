@@ -12,6 +12,10 @@ class Kmeans():
         Seed to initalise the internal random RandomState
     maxiter: int (defaults to 10)
         Maximum number of iterations to do in the fit function
+    init_start: str (defaults to 'centroids')
+        strategy for the initialisation
+          if 'centroids': starts by choosing centroids randomly in X
+          if 'labels': starts by randomly assigning lables to X
 
     Example:
     --------
@@ -22,11 +26,13 @@ class Kmeans():
     >>> y = kmean.fit(X)
     '''
 
-    def __init__(self, nbclusters=3, random_state=42, maxiter=10):
+    def __init__(self, nbclusters=3, random_state=42, maxiter=10,
+                        init_start='centroids'):
         '''Init function'''
         self.nbclusters = nbclusters
         self._rs = np.random.RandomState(random_state)
         self.maxiter = maxiter
+        self.init_start = init_start
 
     def _init_random_labels(self, X):
         '''returns initial randomly picked classes for the data X'''
@@ -64,9 +70,16 @@ class Kmeans():
 
     def fit(self, X, debug=False):
         '''fit function: trains a kmean solver'''
-        labels = self._init_random_labels(X)
-        if debug:
-            centroid_keep, label_keep = [], [labels]
+
+        if self.init_start == 'centroids':
+            centroids = self._init_random_centroids(X)
+            labels = self._get_clusters(X, centroids)
+        elif self.init_start == 'labels':
+            centroids = self._init_random_centroids(X)
+            labels = self._init_random_labels(X)
+
+        centroid_keep, label_keep = [centroids], [labels]
+
         for i in range(self.maxiter):
             centroids = self._get_centroids(X, labels)
             newlabels = self._get_clusters(X, centroids)
