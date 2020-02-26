@@ -1,4 +1,3 @@
-from scipy.spatial import KDTree
 import numpy as np
 
 class Kmeans():
@@ -10,30 +9,34 @@ class Kmeans():
         The number of clusters into which to separate the data
     random_state: int, str, float
         Seed to initalise the internal random RandomState
-    maxiter: int (defaults to 10)
+    maxiter: int (defaults to 100)
         Maximum number of iterations to do in the fit function
     init: str (defaults to 'centroids')
         strategy for the initialisation
           if 'centroids': starts by choosing centroids randomly in X
           if 'labels': starts by randomly assigning lables to X
           if 'K++': starts using the kmean++ algorithm
+    n_init: int (defaults to 1)
+        number of kmean to train. the final model will be the one with
+        the lowest inertia
 
     Example:
     --------
     >>> import numpy as np
     >>> from Kmeans import Kmeans
     >>> X = np.random.rand(500, 2)
-    >>> kmean = Kmeans(n_clusters=3, maxiter=15)
+    >>> kmean = Kmeans(n_clusters=3)
     >>> y = kmean.fit(X)
     '''
 
-    def __init__(self, n_clusters=3, random_state=42, maxiter=10,
+    def __init__(self, n_clusters=3, random_state=42, maxiter=100,
                         init='centroids', n_init=1):
         '''Init function'''
         self.n_clusters = n_clusters
         self._rs = np.random.RandomState(random_state)
         self.maxiter = maxiter
         self.init = init
+        self.n_init = n_init
 
     def _pick_within_proba(self, proba):
         '''returns a random number picked with proba'''
@@ -47,9 +50,7 @@ class Kmeans():
 
     def _init_random_centroids(self, X):
         '''returns initial randomly picked classes for the data X'''
-        rdm_index = self._rs.choice(range(len(X)),
-                                    self.n_clusters,
-                                    replace=False)
+        rdm_index = self._rs.randint(0, len(X), self.n_clusters)
         return X[rdm_index]
 
     def _init_kmeanpp(self, X):
@@ -85,6 +86,7 @@ class Kmeans():
         return np.argmin(dists, axis=0)
 
     def _get_inertia(self, X, centroids):
+        '''computes the inertia: sum(distance to closest centroid)**2'''
         dists = self._distance_to_centroid(X, centroids)
         return dists.min(axis=0).sum()
 
@@ -104,31 +106,49 @@ class Kmeans():
             labels = self._init_random_labels(X)
         return centroids, labels
 
-    def fit(self, X, debug=False):
-        '''fit function: trains a kmean solver'''
+    def _run_kmean(self, X):
+        '''runs one istance of kmean:
+        initialise according to init parameter
+        then compute centroid / compute label until labels are stable
+        returns (centroids, labels, inertia, label_keep, centroid_keep)
+        '''
         centroids, labels = self._init_fit(X)
-
         centroid_keep, label_keep = [centroids], [labels]
-
         for i in range(self.maxiter):
             centroids = self._get_centroids(X, labels)
             newlabels = self._get_clusters(X, centroids)
-
-            if debug:
-                label_keep.append(newlabels)
-                centroid_keep.append(centroids)
-
+            label_keep.append(newlabels)
+            centroid_keep.append(centroids)
             if np.all(labels == newlabels):
                 break
             labels = newlabels
 
-        self.centroids = centroids
-        self.labels = self.predict(X)
-        self.inertia = self._get_inertia(X, centroids)
+        inertia = self._get_inertia(X, centroids)
+        results = (centroids, labels, inertia, label_keep, centroid_keep)
+        return results
 
-        if debug:
-            self.keep_labels = label_keep
-            self.keep_centroids = centroid_keep
+    def fit(self, X):
+        '''fit function: trains a kmean solver'''
+        assert isinstance(X, np.ndarray), 'X must be a numpy array'
+        if self.n_init == 1:
+            (centroids, labels, inertia,
+            label_keep, centroid_keep) = self._run_kmean(X)
+        else:
+            results = []
+            inertias = []
+            for i in range(self.n_init):
+                result = self._run_kmean(X)
+                results.append(result)
+                inertias.append(result[2])
+            index = np.argmin(inertias)
+            (centroids, labels, inertia,
+            label_keep, centroid_keep) = results[index]
+
+        self.centroids = centroids
+        self.inertia = inertia
+        self.labels = labels
+        self.keep_labels = label_keep
+        self.keep_centroids = centroid_keep
 
         return self.labels
 
