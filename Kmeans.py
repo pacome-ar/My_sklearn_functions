@@ -67,8 +67,7 @@ class Kmeans():
         If X is size n*m and centroids is size k
             returns a n*k array
         '''
-        return np.array([((X - x0)**2).sum(axis=1)
-                         for x0 in centroids])
+        return ((X - centroids[:, np.newaxis])**2).sum(axis=2)
 
     def _get_centroids(self, X, labels):
         '''returns the average coordinates of X for each label in labels'''
@@ -76,6 +75,7 @@ class Kmeans():
         for i in range(self.n_clusters):
             temp = X[labels==i]
             if not len(temp):
+                # UGLY !!!
                 temp = np.zeros((1, X.shape[1]))
             new_centroids.append(temp.mean(axis=0))
         return np.array(new_centroids)
@@ -182,6 +182,12 @@ def test_inertia_with_sklearn(n=200):
 
     print('Inertia test passed')
 
+def test_profiling(n_samples=20000, centers=5, n_features=20, **kmeankwargs):
+    kmean = Kmeans(n_clusters=centers, **kmeankwargs)
+    X = kmean._rs.rand(n_samples, n_features)
+    y_new = kmean.fit(X)
+
 #########################################
 
 test_inertia_with_sklearn(200)
+# test_profiling(10000, 5, 20, n_init=1)
