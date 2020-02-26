@@ -6,38 +6,34 @@ class Kmeans():
 
     Parameters:
     -----------
-    nbclusters: int (defaults 3)
+    n_clusters: int (defaults 3)
         The number of clusters into which to separate the data
     random_state: int, str, float
         Seed to initalise the internal random RandomState
     maxiter: int (defaults to 10)
         Maximum number of iterations to do in the fit function
-    init_start: str (defaults to 'centroids')
+    init: str (defaults to 'centroids')
         strategy for the initialisation
           if 'centroids': starts by choosing centroids randomly in X
           if 'labels': starts by randomly assigning lables to X
           if 'K++': starts using the kmean++ algorithm
-    init_centroids: array like (defaults to None)
-        the initial guesses for the new_centroids
-        will only be used with init_start = 'centroids'
 
     Example:
     --------
     >>> import numpy as np
     >>> from Kmeans import Kmeans
     >>> X = np.random.rand(500, 2)
-    >>> kmean = Kmeans(nbclusters=3, maxiter=15)
+    >>> kmean = Kmeans(n_clusters=3, maxiter=15)
     >>> y = kmean.fit(X)
     '''
 
-    def __init__(self, nbclusters=3, random_state=42, maxiter=10,
-                        init_start='centroids', init_centroids=None):
+    def __init__(self, n_clusters=3, random_state=42, maxiter=10,
+                        init='centroids', n_init=1):
         '''Init function'''
-        self.nbclusters = nbclusters
+        self.n_clusters = n_clusters
         self._rs = np.random.RandomState(random_state)
         self.maxiter = maxiter
-        self.init_start = init_start
-        self.init_centroids = init_centroids
+        self.init = init
 
     def _pick_within_proba(self, proba):
         '''returns a random number picked with proba'''
@@ -47,20 +43,18 @@ class Kmeans():
 
     def _init_random_labels(self, X):
         '''returns initial randomly picked classes for the data X'''
-        return self._rs.randint(0, self.nbclusters, len(X))
+        return self._rs.randint(0, self.n_clusters, len(X))
 
     def _init_random_centroids(self, X):
         '''returns initial randomly picked classes for the data X'''
-        if self.init_centroids:
-            return init_centroids
         rdm_index = self._rs.choice(range(len(X)),
-                                    self.nbclusters,
+                                    self.n_clusters,
                                     replace=False)
         return X[rdm_index]
 
     def _init_kmeanpp(self, X):
         centroids = [X[self._rs.randint(0, len(X)+1)]]
-        for i in range(self.nbclusters):
+        for i in range(self.n_clusters):
             proba = self._distance_to_centroid(
                         X, np.array(centroids, copy=True)).min(axis=0)
             proba = proba / proba.sum()
@@ -78,7 +72,7 @@ class Kmeans():
     def _get_centroids(self, X, labels):
         '''returns the average coordinates of X for each label in labels'''
         new_centroids = []
-        for i in range(self.nbclusters):
+        for i in range(self.n_clusters):
             temp = X[labels==i]
             if not len(temp):
                 temp = np.zeros((1, X.shape[1]))
@@ -94,18 +88,25 @@ class Kmeans():
         dists = self._distance_to_centroid(X, centroids)
         return dists.min(axis=0).sum()
 
-    def fit(self, X, debug=False):
-        '''fit function: trains a kmean solver'''
-
-        if self.init_start == 'centroids':
+    def _init_fit(self, X):
+        '''returns the initilisation corresponding to the self.init param'''
+        if self.init == 'centroids':
             centroids = self._init_random_centroids(X)
             labels = self._get_clusters(X, centroids)
-        if self.init_start == 'K++':
+        elif self.init == 'K++':
             centroids = self._init_kmeanpp(X)
             labels = self._get_clusters(X, centroids)
-        elif self.init_start == 'labels':
+        elif isinstance(self.init, (list, np.ndarray)):
+            centroids = self.init
+            labels = self._get_clusters(X, centroids)
+        elif self.init == 'labels':
             centroids = self._init_random_centroids(X)
             labels = self._init_random_labels(X)
+        return centroids, labels
+
+    def fit(self, X, debug=False):
+        '''fit function: trains a kmean solver'''
+        centroids, labels = self._init_fit(X)
 
         centroid_keep, label_keep = [centroids], [labels]
 
@@ -114,7 +115,7 @@ class Kmeans():
             newlabels = self._get_clusters(X, centroids)
 
             if debug:
-                label_keep.append(labels)
+                label_keep.append(newlabels)
                 centroid_keep.append(centroids)
 
             if np.all(labels == newlabels):
@@ -126,7 +127,6 @@ class Kmeans():
         self.inertia = self._get_inertia(X, centroids)
 
         if debug:
-            label_keep.append(self.labels)
             self.keep_labels = label_keep
             self.keep_centroids = centroid_keep
 
@@ -152,8 +152,8 @@ def test_inertia_with_sklearn(n=200):
     sk = skKmeans(n_clusters=3)
     sk.fit(X)
 
-    kmean = Kmeans(nbclusters=3, maxiter=15, random_state=1,
-              init_start='centroids')
+    kmean = Kmeans(n_clusters=3, maxiter=15, random_state=1,
+              init='centroids')
     kmean.fit(X)
 
     assert np.allclose(kmean.inertia, sk.inertia_), \
