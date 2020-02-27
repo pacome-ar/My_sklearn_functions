@@ -161,6 +161,28 @@ class Kmeans():
 
         return self._get_clusters(X, self.centroids)
 
+
+def kmeans_alg(X, k, **kmeankwargs):
+    '''Performs kmean clustering
+
+    Parameters:
+    -----------
+    X: np.ndarray (n samples * m features)
+        the data to clusterize
+    k: int
+        number of cluster to find
+    kmeankwargs: dict
+        additionnal kmean algorithm parameters (see Kmean class)
+
+    Returns:
+    --------
+    ret: np.ndarray (n samples)
+        the labels (class) corresponding to the different clusters
+    '''
+    kmean = Kmeans(n_clusters=k, **kmeankwargs)
+    y_new = kmean.fit(X)
+    return y_new
+
 #########################################
 
 def test_inertia_with_sklearn(n=200):
