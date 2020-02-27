@@ -157,7 +157,7 @@ class Kmeans():
         try:
             self.centroids
         except ValueError:
-            raise Exception('can not transform an unfitted kmean')
+            raise AttributeError('can not predict with an unfitted kmean')
 
         return self._get_clusters(X, self.centroids)
 
