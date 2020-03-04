@@ -68,6 +68,9 @@ class Node():
         self.gini = gini
         self.samples = samples
         self.classlabel = classlabel
+    def __repr__(self):
+        pass
+
 
 def make_node(X, y, leaf=False):
     if not len(y):
@@ -117,6 +120,8 @@ def run_tree(tree, x0):
         else:
             subtree = subtree[1]
     return node
+
+# use logging
 
 def predict(tree, X):
     return [run_tree(tree, x).classlabel for x in X]
